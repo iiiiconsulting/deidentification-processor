@@ -1,10 +1,9 @@
 """Google OAuth2 authentication for Sheets and Drive APIs.
 
 Stores credentials at ~/.deid/credentials.json.
-Requires a client_secrets.json (OAuth client ID) — place it at ~/.deid/client_secrets.json.
+OAuth client ID is embedded — just run `deid auth` to authenticate.
 """
 
-import json
 import os
 from pathlib import Path
 
@@ -20,7 +19,24 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive.file",
 ]
 
-CLIENT_SECRETS_PATH = DEID_HOME / "client_secrets.json"
+# Embedded OAuth client ID for installed/desktop app.
+# This is NOT a secret — per Google's docs, client IDs for installed apps
+# are considered public. Users still authenticate via browser OAuth flow.
+#
+# TODO: Replace placeholder values with actual OAuth client ID from
+# Google Cloud Console → APIs & Credentials → OAuth 2.0 Client IDs
+# Project: REDACTED_PROJECT_ID
+_INSTALLED_CLIENT = {
+    "installed": {
+        "client_id": "YOUR_CLIENT_ID.apps.googleusercontent.com",
+        "project_id": "REDACTED_PROJECT_ID",
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token",
+        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+        "client_secret": "YOUR_CLIENT_SECRET",
+        "redirect_uris": ["http://localhost"],
+    }
+}
 
 
 def get_credentials() -> Credentials:
@@ -40,15 +56,7 @@ def get_credentials() -> Credentials:
             creds = None  # Fall through to full auth flow
 
     if not creds or not creds.valid:
-        if not CLIENT_SECRETS_PATH.exists():
-            raise FileNotFoundError(
-                f"OAuth client secrets not found at {CLIENT_SECRETS_PATH}\n"
-                "Download your OAuth client ID JSON from Google Cloud Console\n"
-                f"and save it as {CLIENT_SECRETS_PATH}"
-            )
-        flow = InstalledAppFlow.from_client_secrets_file(
-            str(CLIENT_SECRETS_PATH), SCOPES
-        )
+        flow = InstalledAppFlow.from_client_config(_INSTALLED_CLIENT, SCOPES)
         creds = flow.run_local_server(port=0)
 
     # Save for next time with restricted permissions

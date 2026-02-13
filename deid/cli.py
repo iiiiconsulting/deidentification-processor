@@ -9,7 +9,7 @@ import pandas as pd
 from .config import detect_file_type, list_targets, load_target, SHEET_TAB_NAMES
 from .deidentifier import deidentify
 from .preprocessor import preprocess
-from .sheets import create_target_sheet, write_to_sheet
+from .sheets import create_target_sheet, get_salt, write_to_sheet
 
 
 @click.group()
@@ -26,12 +26,8 @@ def auth():
     """Authenticate with Google (opens browser for OAuth2 flow)."""
     from .auth import get_credentials
 
-    try:
-        get_credentials()
-        click.echo("✓ Authenticated successfully. Credentials saved.")
-    except FileNotFoundError as e:
-        click.echo(str(e), err=True)
-        sys.exit(1)
+    get_credentials()
+    click.echo("✓ Authenticated successfully. Credentials saved.")
 
 
 # --- Target commands ---
@@ -48,7 +44,7 @@ def target_create(name):
     """Create a new target Google Sheet with all required tabs."""
     try:
         config = create_target_sheet(name)
-        click.echo(f"✓ Target '{name}' created. Salt generated and config saved.")
+        click.echo(f"✓ Target '{name}' created. Config saved.")
     except Exception as e:
         click.echo(f"Error creating target: {e}", err=True)
         sys.exit(1)
@@ -99,9 +95,9 @@ def process(target_name, dry_run, files):
         click.echo(str(e), err=True)
         sys.exit(1)
 
-    salt = config["salt"]
     spreadsheet_id = config["spreadsheet_id"]
     reiden_spreadsheet_id = config.get("reiden_spreadsheet_id", spreadsheet_id)
+    salt = get_salt(reiden_spreadsheet_id)
 
     if dry_run:
         click.echo("⚠ DRY RUN — no data will be written to Google Sheets.\n")

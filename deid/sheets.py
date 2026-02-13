@@ -1,6 +1,7 @@
 """Google Sheets integration: create targets, write data with dedup."""
 
 import math
+import secrets
 
 import click
 import gspread
@@ -9,6 +10,8 @@ import pandas as pd
 from .auth import authorize_gspread
 from .config import REIDEN_TAB_NAME, SHEET_TAB_NAMES, create_target_config, save_target
 from .deidentifier import content_hash
+
+CONFIG_TAB_NAME = "Config"
 
 REIDEN_HEADERS = ["patientId", "originalName", "source", "dateAdded"]
 
@@ -51,6 +54,11 @@ def create_target_sheet(name: str) -> dict:
     reiden_ws.update_title(REIDEN_TAB_NAME)
     reiden_ws.update("A1", [REIDEN_HEADERS])
 
+    # Add Config tab with salt
+    salt = secrets.token_hex(32)
+    config_ws = reiden_spreadsheet.add_worksheet(title=CONFIG_TAB_NAME, rows=2, cols=2)
+    config_ws.update("A1", [["salt", salt]])
+
     config = create_target_config(name, data_spreadsheet.id, reiden_spreadsheet.id)
     save_target(name, config)
 
@@ -59,6 +67,17 @@ def create_target_sheet(name: str) -> dict:
     click.echo(f"Data Spreadsheet ID: {data_spreadsheet.id}")
     click.echo(f"Reiden Spreadsheet ID: {reiden_spreadsheet.id}")
     return config
+
+
+def get_salt(reiden_spreadsheet_id: str) -> str:
+    """Read the salt from the Config tab of the reiden spreadsheet."""
+    gc = authorize_gspread()
+    spreadsheet = gc.open_by_key(reiden_spreadsheet_id)
+    config_ws = spreadsheet.worksheet(CONFIG_TAB_NAME)
+    salt = config_ws.acell("B1").value
+    if not salt:
+        raise ValueError("Salt not found in reiden spreadsheet Config tab (B1 is empty)")
+    return salt
 
 
 def write_to_sheet(

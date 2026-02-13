@@ -6,7 +6,6 @@ Targets are stored in ~/.deid/targets/<name>.yaml.
 
 import os
 import re
-import secrets
 from datetime import date
 from pathlib import Path
 
@@ -113,10 +112,9 @@ def save_target(name: str, config: dict):
 
 
 def create_target_config(name: str, spreadsheet_id: str, reiden_spreadsheet_id: str) -> dict:
-    """Create a new target config dict with a random salt."""
+    """Create a new target config dict (salt is stored in the reiden sheet, not here)."""
     return {
         "name": name,
-        "salt": secrets.token_hex(32),
         "created": date.today().isoformat(),
         "spreadsheet_id": spreadsheet_id,
         "reiden_spreadsheet_id": reiden_spreadsheet_id,
