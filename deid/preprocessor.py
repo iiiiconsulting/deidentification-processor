@@ -13,15 +13,6 @@ import pandas as pd
 from .config import load_rules
 
 
-def _matches_row(row: pd.Series, match_spec: dict) -> bool:
-    """Check if a row matches all conditions in a match spec (case-insensitive)."""
-    for col, expected in match_spec.items():
-        val = str(row.get(col, "")).strip().lower()
-        if val != str(expected).strip().lower():
-            return False
-    return True
-
-
 def preprocess(df: pd.DataFrame, sheet_type: str) -> pd.DataFrame:
     """Apply pre-processing rules to a DataFrame.
 
@@ -41,12 +32,19 @@ def preprocess(df: pd.DataFrame, sheet_type: str) -> pd.DataFrame:
         set_spec = rule.get("set", {})
         append_spec = rule.get("append", {})
 
-        for idx, row in df.iterrows():
-            if _matches_row(row, match_spec):
-                for col, val in set_spec.items():
-                    df.at[idx, col] = val
-                for col, val in append_spec.items():
-                    existing = str(df.at[idx, col]) if pd.notna(df.at[idx, col]) else ""
-                    df.at[idx, col] = existing + val
+        # Build boolean mask using vectorized operations
+        mask = pd.Series(True, index=df.index)
+        for col, expected in match_spec.items():
+            expected_lower = str(expected).strip().lower()
+            mask = mask & (df[col].astype(str).str.strip().str.lower() == expected_lower)
+
+        if not mask.any():
+            continue
+
+        for col, val in set_spec.items():
+            df.loc[mask, col] = val
+
+        for col, val in append_spec.items():
+            df.loc[mask, col] = df.loc[mask, col].fillna("").astype(str) + val
 
     return df

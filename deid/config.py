@@ -31,15 +31,17 @@ FILE_TYPE_MAP = {
     "Contracts": "contracts",
 }
 
-# Display names for Google Sheet tabs
+# Display names for Google Sheet tabs (data sheets only — reiden is separate)
 SHEET_TAB_NAMES = {
     "product_sales": "ProductSalesReport",
     "payments": "Payments",
     "invoices": "Invoices",
     "customers": "Customers",
     "contracts": "Contracts",
-    "reiden_map": "ReidentificationMap",
 }
+
+# Reiden map tab name (lives in its own spreadsheet)
+REIDEN_TAB_NAME = "ReidentificationMap"
 
 
 def ensure_dirs():
@@ -94,25 +96,30 @@ def load_target(name: str) -> dict:
     if not path.exists():
         raise FileNotFoundError(f"Target '{name}' not found at {path}")
     with open(path) as f:
-        return yaml.safe_load(f)
+        data = yaml.safe_load(f)
+    if not data:
+        raise ValueError(f"Target '{name}' config is empty or invalid at {path}")
+    return data
 
 
 def save_target(name: str, config: dict):
-    """Save a target config to disk."""
+    """Save a target config to disk with restricted permissions."""
     ensure_dirs()
     path = target_path(name)
     with open(path, "w") as f:
         yaml.dump(config, f, default_flow_style=False)
+    os.chmod(path, 0o600)
     return path
 
 
-def create_target_config(name: str, spreadsheet_id: str) -> dict:
+def create_target_config(name: str, spreadsheet_id: str, reiden_spreadsheet_id: str) -> dict:
     """Create a new target config dict with a random salt."""
     return {
         "name": name,
         "salt": secrets.token_hex(32),
         "created": date.today().isoformat(),
         "spreadsheet_id": spreadsheet_id,
+        "reiden_spreadsheet_id": reiden_spreadsheet_id,
     }
 
 

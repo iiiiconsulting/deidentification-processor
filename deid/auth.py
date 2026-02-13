@@ -5,8 +5,10 @@ Requires a client_secrets.json (OAuth client ID) — place it at ~/.deid/client_
 """
 
 import json
+import os
 from pathlib import Path
 
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -15,7 +17,7 @@ from .config import CREDENTIALS_PATH, DEID_HOME
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/drive.file",
 ]
 
 CLIENT_SECRETS_PATH = DEID_HOME / "client_secrets.json"
@@ -32,8 +34,12 @@ def get_credentials() -> Credentials:
         return creds
 
     if creds and creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-    else:
+        try:
+            creds.refresh(Request())
+        except RefreshError:
+            creds = None  # Fall through to full auth flow
+
+    if not creds or not creds.valid:
         if not CLIENT_SECRETS_PATH.exists():
             raise FileNotFoundError(
                 f"OAuth client secrets not found at {CLIENT_SECRETS_PATH}\n"
@@ -45,10 +51,11 @@ def get_credentials() -> Credentials:
         )
         creds = flow.run_local_server(port=0)
 
-    # Save for next time
+    # Save for next time with restricted permissions
     DEID_HOME.mkdir(parents=True, exist_ok=True)
     with open(CREDENTIALS_PATH, "w") as f:
         f.write(creds.to_json())
+    os.chmod(CREDENTIALS_PATH, 0o600)
 
     return creds
 
