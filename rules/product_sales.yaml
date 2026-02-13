@@ -1,0 +1,8 @@
+# Pre-processing rules for ProductSalesReport
+# Example:
+#   rules:
+#     - match:
+#         customerName: "Jane Doe"
+#       append:
+#         customerName: " Sr."
+rules: []

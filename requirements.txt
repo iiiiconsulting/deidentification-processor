@@ -1,0 +1,6 @@
+click>=8.0
+pandas>=1.5
+gspread>=5.0
+google-auth-oauthlib>=1.0
+google-auth>=2.0
+pyyaml>=6.0

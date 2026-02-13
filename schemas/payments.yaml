@@ -1,0 +1,20 @@
+# Payments schema
+# Source columns: Customer Number, Reference, Customer, Tran Type, Tender, Amount, Status, Auth Code, Source, Memo, Date/Time, Invoice, Tax
+
+identity:
+  source: Customer
+
+columns:
+  Customer: hash
+  Customer Number: strip
+  Auth Code: strip
+  Memo: strip
+  Reference: pass
+  Tran Type: pass
+  Tender: pass
+  Amount: pass
+  Status: pass
+  Source: pass
+  Date/Time: pass
+  Invoice: pass
+  Tax: pass

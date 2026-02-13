@@ -1,0 +1,14 @@
+# Invoices schema
+# Source columns: invoiceNumber, customerName, totalAmount, type, invoiceDate, dueDate, terms
+
+identity:
+  source: customerName
+
+columns:
+  customerName: hash
+  invoiceNumber: pass
+  totalAmount: pass
+  type: pass
+  invoiceDate: pass
+  dueDate: pass
+  terms: pass

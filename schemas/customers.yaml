@@ -1,0 +1,33 @@
+# Customers schema
+# Source columns: Id, firstName, lastName, spendProfile, addressName, address1, address2,
+#   city, state, zip, country, primaryContact, customerNumber, lastActivity, isTaxExempt,
+#   email, mobile, phoneIsMobile, isVip, lastVisit, visits, sales, refunds
+
+# Combined first+last name for identity hash
+identity:
+  source: [firstName, lastName]
+
+columns:
+  firstName: hash
+  lastName: hash
+  Id: strip
+  addressName: strip
+  address1: strip
+  address2: strip
+  city: strip
+  state: strip
+  zip: strip
+  email: strip
+  mobile: strip
+  primaryContact: strip
+  phoneIsMobile: strip
+  customerNumber: strip
+  spendProfile: pass
+  country: pass
+  lastActivity: pass
+  isTaxExempt: pass
+  isVip: pass
+  lastVisit: pass
+  visits: pass
+  sales: pass
+  refunds: pass
