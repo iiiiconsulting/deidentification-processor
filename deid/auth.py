@@ -23,17 +23,15 @@ SCOPES = [
 # This is NOT a secret — per Google's docs, client IDs for installed apps
 # are considered public. Users still authenticate via browser OAuth flow.
 #
-# TODO: Replace placeholder values with actual OAuth client ID from
-# Google Cloud Console → APIs & Credentials → OAuth 2.0 Client IDs
 # Project: REDACTED_PROJECT_ID
 _INSTALLED_CLIENT = {
     "installed": {
-        "client_id": "YOUR_CLIENT_ID.apps.googleusercontent.com",
+        "client_id": "REDACTED_CLIENT_ID",
         "project_id": "REDACTED_PROJECT_ID",
         "auth_uri": "https://accounts.google.com/o/oauth2/auth",
         "token_uri": "https://oauth2.googleapis.com/token",
         "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-        "client_secret": "YOUR_CLIENT_SECRET",
+        "client_secret": "REDACTED_CLIENT_SECRET",
         "redirect_uris": ["http://localhost"],
     }
 }
