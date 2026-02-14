@@ -127,6 +127,9 @@ def write_to_sheet(
 
     if new_rows:
         start_row = len(existing_data) + 1 if existing_data else 2
+        needed_rows = start_row + len(new_rows) - 1
+        if ws.row_count < needed_rows:
+            ws.resize(rows=needed_rows)
         ws.update(f"A{start_row}", new_rows)
         click.echo(f"  {tab_name}: wrote {len(new_rows)} new rows ({len(df) - len(new_rows)} duplicates skipped)")
     else:
@@ -181,6 +184,9 @@ def write_reiden_map(
 
     if new_reiden_rows:
         start_row = len(reiden_data) + 1 if reiden_data else 2
+        needed_rows = start_row + len(new_reiden_rows) - 1
+        if reiden_ws.row_count < needed_rows:
+            reiden_ws.resize(rows=needed_rows)
         reiden_ws.update(f"A{start_row}", new_reiden_rows)
         click.echo(f"  ReidentificationMap: added {len(new_reiden_rows)} new mappings")
     else:
