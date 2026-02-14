@@ -9,7 +9,7 @@ columns:
   name: pass
   interval: pass
   every: pass
-  on: pass
+  "on": pass
   plan: pass
   amount: pass
   status: pass
