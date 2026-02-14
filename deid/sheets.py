@@ -110,8 +110,10 @@ def write_to_sheet(
 
     existing_data = ws.get_all_values()
 
+    # get_all_values() may return [['', '', ...]] for an empty/cleared sheet
     wrote_headers = False
-    if not existing_data:
+    is_empty = not existing_data or (len(existing_data) == 1 and all(c == '' for c in existing_data[0]))
+    if is_empty:
         headers = df_with_hash.columns.tolist()
         ws.resize(rows=1, cols=len(headers))
         ws.update("A1", [headers])
