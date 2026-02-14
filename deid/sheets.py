@@ -102,29 +102,36 @@ def write_to_sheet(
     except gspread.WorksheetNotFound:
         ws = spreadsheet.add_worksheet(title=tab_name, rows=1, cols=26)
 
+    # Compute content hashes and add as a column
+    HASH_COL = "_contentHash"
+    hashes = df.apply(content_hash, axis=1)
+    df_with_hash = df.copy()
+    df_with_hash[HASH_COL] = hashes
+
     existing_data = ws.get_all_values()
 
     if not existing_data:
-        headers = df.columns.tolist()
-        # Ensure sheet has room for header row
+        headers = df_with_hash.columns.tolist()
         if ws.row_count < 1:
             ws.resize(rows=1)
         ws.update("A1", [headers])
         existing_hashes = set()
-        click.echo(f"  {tab_name}: wrote headers {headers}")
     else:
         headers = existing_data[0]
         existing_hashes = set()
-        for row in existing_data[1:]:
-            row_series = pd.Series(row, index=headers)
-            existing_hashes.add(content_hash(row_series))
+        # Read existing hashes from the _contentHash column
+        if HASH_COL in headers:
+            hash_idx = headers.index(HASH_COL)
+            for row in existing_data[1:]:
+                if len(row) > hash_idx and row[hash_idx]:
+                    existing_hashes.add(row[hash_idx])
 
     # Only dedup against existing sheet data (re-import protection).
     # Within-file duplicates are kept — they represent legitimate repeated entries.
     new_rows = []
     dupe_count = 0
-    for idx, row in df.iterrows():
-        h = content_hash(row)
+    for idx, row in df_with_hash.iterrows():
+        h = row[HASH_COL]
         if h in existing_hashes:
             dupe_count += 1
             if dupe_count <= 10:
@@ -141,9 +148,9 @@ def write_to_sheet(
         if ws.row_count < needed_rows:
             ws.resize(rows=needed_rows)
         ws.update(f"A{start_row}", new_rows)
-        click.echo(f"  {tab_name}: wrote {len(new_rows)} new rows ({len(df) - len(new_rows)} duplicates skipped)")
+        click.echo(f"  {tab_name}: wrote {len(new_rows)} new rows ({dupe_count} re-import duplicates skipped)")
     else:
-        click.echo(f"  {tab_name}: no new rows (all duplicates)")
+        click.echo(f"  {tab_name}: no new rows ({dupe_count} re-import duplicates skipped)")
 
 
 def write_reiden_map(
