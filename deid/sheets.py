@@ -17,16 +17,13 @@ REIDEN_HEADERS = ["patientId", "originalName", "source", "dateAdded"]
 
 
 def _sanitize_row(row: list) -> list:
-    """Replace NaN/None values with empty string for Sheets API compatibility."""
-    result = []
-    for v in row:
-        if v is None:
-            result.append("")
-        elif isinstance(v, float) and math.isnan(v):
-            result.append("")
-        else:
-            result.append(v)
-    return result
+    """Convert all values to their Sheets string representation.
+
+    Uses the same conversion as content_hash so that hashing a fresh row
+    matches hashing the same row read back from Sheets.
+    """
+    from .deidentifier import _to_sheet_string
+    return [_to_sheet_string(v) for v in row]
 
 
 def create_target_sheet(name: str) -> dict:

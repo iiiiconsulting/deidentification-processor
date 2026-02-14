@@ -160,9 +160,31 @@ def deidentify(df: pd.DataFrame, sheet_type: str, salt: str, *, dry_run: bool = 
 def content_hash(row: pd.Series) -> str:
     """Compute a content hash for dedup — hash of all column values in the row.
 
-    Columns are sorted for order-independence. Values are normalized:
-    NaN→'', float ints→int strings.
+    Columns are sorted for order-independence. Values are normalized to match
+    exactly how Google Sheets stores and returns them (everything as strings).
     """
     sorted_keys = sorted(row.index)
-    values = "|".join(_normalize_cell(row[k]) for k in sorted_keys)
+    values = "|".join(_to_sheet_string(row[k]) for k in sorted_keys)
     return hashlib.sha256(values.encode("utf-8")).hexdigest()
+
+
+def _to_sheet_string(v) -> str:
+    """Convert a value to exactly what Google Sheets would store/return.
+
+    This must produce identical output whether called on:
+    - A fresh pandas value (int, float, str, NaN)
+    - A string read back from Sheets via get_all_values()
+    """
+    if _is_nan(v):
+        return ""
+    if isinstance(v, bool):
+        return "TRUE" if v else "FALSE"
+    if isinstance(v, float):
+        # Sheets strips trailing .0 for whole numbers
+        if v == int(v) and not math.isinf(v):
+            return str(int(v))
+        return str(v)
+    if isinstance(v, int):
+        return str(v)
+    # Already a string (from Sheets or pandas)
+    return str(v)
