@@ -115,7 +115,15 @@ def deidentify(df: pd.DataFrame, sheet_type: str, salt: str, *, dry_run: bool = 
     skip_mask = original_names.apply(lambda n: _is_nan(n) or n.strip() == "")
     if skip_mask.any():
         count = skip_mask.sum()
-        click.echo(f"  ⚠ Skipping {count} row(s) with missing identity fields in {sheet_type}")
+        click.echo(f"  ⚠ Skipping {count} row(s) with missing identity fields in {sheet_type}:")
+        for idx in df.index[skip_mask]:
+            csv_row = idx + 2  # +1 for 0-index, +1 for header row
+            identity_col = identity_source if isinstance(identity_source, str) else identity_source
+            if isinstance(identity_col, list):
+                vals = {c: repr(df.at[idx, c]) if c in df.columns else "N/A" for c in identity_col}
+            else:
+                vals = {identity_col: repr(df.at[idx, identity_col]) if identity_col in df.columns else "N/A"}
+            click.echo(f"    Row {csv_row}: {vals}")
 
     patient_ids = original_names.apply(lambda name: _hash_value(salt, name))
 
