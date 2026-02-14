@@ -91,16 +91,7 @@ def write_to_sheet(
 ):
     """Write deidentified data to the appropriate tab with dedup."""
     if dry_run:
-        # Still compute dedup stats in dry-run
-        seen_hashes = set()
-        dupes = 0
-        for _, row in df.iterrows():
-            h = content_hash(row)
-            if h in seen_hashes:
-                dupes += 1
-            else:
-                seen_hashes.add(h)
-        click.echo(f"  [DRY RUN] {SHEET_TAB_NAMES[sheet_type]}: {len(df) - dupes} rows would be written ({dupes} duplicates within input)")
+        click.echo(f"  [DRY RUN] {SHEET_TAB_NAMES[sheet_type]}: {len(df)} rows would be written")
         return
 
     gc = authorize_gspread()
@@ -131,21 +122,21 @@ def write_to_sheet(
             row_series = pd.Series(row, index=headers)
             existing_hashes.add(content_hash(row_series))
 
+    # Only dedup against existing sheet data (re-import protection).
+    # Within-file duplicates are kept — they represent legitimate repeated entries.
     new_rows = []
     dupe_count = 0
     for idx, row in df.iterrows():
         h = content_hash(row)
-        if h not in existing_hashes:
-            new_rows.append(_sanitize_row(row.values.tolist()))
-            existing_hashes.add(h)
-        else:
+        if h in existing_hashes:
             dupe_count += 1
-            if dupe_count <= 10:  # Log first 10 dupes
+            if dupe_count <= 10:
                 csv_row = idx + 2
-                pid = row.get("patientId", "?")
-                click.echo(f"    Duplicate at input row {csv_row}: patientId={str(pid)[:16]}...")
+                click.echo(f"    Re-import duplicate at input row {csv_row} (already in sheet, skipping)")
             elif dupe_count == 11:
-                click.echo(f"    ... (suppressing further duplicate logs)")
+                click.echo(f"    ... (suppressing further re-import duplicate logs)")
+        else:
+            new_rows.append(_sanitize_row(row.values.tolist()))
 
     if new_rows:
         start_row = len(existing_data) + 1 if existing_data else 2
