@@ -110,21 +110,18 @@ def write_to_sheet(
 
     existing_data = ws.get_all_values()
 
-    # get_all_values() may return [['', '', ...]] for an empty/cleared sheet
-    wrote_headers = False
-    is_empty = not existing_data or (len(existing_data) == 1 and all(c == '' for c in existing_data[0]))
-    if is_empty:
-        headers = df_with_hash.columns.tolist()
-        ws.resize(rows=1, cols=len(headers))
-        ws.update("A1", [headers])
-        wrote_headers = True
-        existing_hashes = set()
-    else:
-        headers = existing_data[0]
-        existing_hashes = set()
-        # Read existing hashes from the _contentHash column
-        if HASH_COL in headers:
-            hash_idx = headers.index(HASH_COL)
+    # Always force-write headers in row 1
+    headers = df_with_hash.columns.tolist()
+    ws.resize(rows=max(1, ws.row_count), cols=len(headers))
+    ws.update("A1", [headers])
+
+    # Check for existing data rows (skip header row)
+    existing_hashes = set()
+    is_empty = not existing_data or (len(existing_data) <= 1 and all(c == '' for c in existing_data[0]))
+    if not is_empty and len(existing_data) > 1:
+        old_headers = existing_data[0]
+        if HASH_COL in old_headers:
+            hash_idx = old_headers.index(HASH_COL)
             for row in existing_data[1:]:
                 if len(row) > hash_idx and row[hash_idx]:
                     existing_hashes.add(row[hash_idx])
@@ -146,7 +143,7 @@ def write_to_sheet(
             new_rows.append(_sanitize_row(row.values.tolist()))
 
     if new_rows:
-        start_row = 2 if wrote_headers else len(existing_data) + 1
+        start_row = 2 if is_empty else len(existing_data) + 1
         needed_rows = start_row + len(new_rows) - 1
         if ws.row_count < needed_rows:
             ws.resize(rows=needed_rows)
@@ -181,11 +178,11 @@ def write_reiden_map(
 
     reiden_data = reiden_ws.get_all_values()
 
-    if not reiden_data:
-        reiden_ws.update("A1", [REIDEN_HEADERS])
-        existing_patient_ids = set()
-    else:
-        existing_patient_ids = set()
+    # Always force-write headers in row 1
+    reiden_ws.update("A1", [REIDEN_HEADERS])
+
+    existing_patient_ids = set()
+    if reiden_data and len(reiden_data) > 1:
         for row in reiden_data[1:]:
             if len(row) >= 1:
                 existing_patient_ids.add(row[0])  # patientId only

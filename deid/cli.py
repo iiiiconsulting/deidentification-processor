@@ -92,21 +92,24 @@ def target_reset(name):
     from .auth import authorize_gspread
     gc = authorize_gspread()
 
-    # Clear data sheets
+    from .sheets import REIDEN_HEADERS
+
+    # Clear data sheets and force-write headers
     spreadsheet = gc.open_by_key(config["spreadsheet_id"])
     for ws in spreadsheet.worksheets():
         ws.clear()
         ws.resize(rows=1, cols=26)
     click.echo(f"✓ Cleared all data sheets")
 
-    # Clear reiden map (but preserve Config tab with salt)
+    # Clear reiden map (but preserve Config tab with salt), re-write headers
     reiden = gc.open_by_key(config["reiden_spreadsheet_id"])
     for ws in reiden.worksheets():
         if ws.title == "Config":
             continue  # Don't touch the salt
         ws.clear()
         ws.resize(rows=1, cols=10)
-    click.echo(f"✓ Cleared reiden map (salt preserved)")
+        ws.update("A1", [REIDEN_HEADERS])
+    click.echo(f"✓ Cleared reiden map (headers reset, salt preserved)")
     click.echo(f"✓ Target '{name}' reset. Ready for fresh import.")
 
 
