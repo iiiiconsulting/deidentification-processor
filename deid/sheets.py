@@ -110,11 +110,12 @@ def write_to_sheet(
 
     existing_data = ws.get_all_values()
 
+    wrote_headers = False
     if not existing_data:
         headers = df_with_hash.columns.tolist()
-        if ws.row_count < 1:
-            ws.resize(rows=1)
+        ws.resize(rows=1, cols=len(headers))
         ws.update("A1", [headers])
+        wrote_headers = True
         existing_hashes = set()
     else:
         headers = existing_data[0]
@@ -143,7 +144,7 @@ def write_to_sheet(
             new_rows.append(_sanitize_row(row.values.tolist()))
 
     if new_rows:
-        start_row = len(existing_data) + 1 if existing_data else 2
+        start_row = 2 if wrote_headers else len(existing_data) + 1
         needed_rows = start_row + len(new_rows) - 1
         if ws.row_count < needed_rows:
             ws.resize(rows=needed_rows)
