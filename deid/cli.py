@@ -78,6 +78,38 @@ def target_info(name):
     # Salt intentionally not displayed
 
 
+@target.command("reset")
+@click.argument("name")
+@click.confirmation_option(prompt="This will delete all data in the target's sheets. Are you sure?")
+def target_reset(name):
+    """Clear all data from a target's sheets (keeps headers and config)."""
+    try:
+        config = load_target(name)
+    except (FileNotFoundError, ValueError) as e:
+        click.echo(str(e), err=True)
+        sys.exit(1)
+
+    from .auth import authorize_gspread
+    gc = authorize_gspread()
+
+    # Clear data sheets
+    spreadsheet = gc.open_by_key(config["spreadsheet_id"])
+    for ws in spreadsheet.worksheets():
+        ws.clear()
+        ws.resize(rows=1, cols=26)
+    click.echo(f"✓ Cleared all data sheets")
+
+    # Clear reiden map (but preserve Config tab with salt)
+    reiden = gc.open_by_key(config["reiden_spreadsheet_id"])
+    for ws in reiden.worksheets():
+        if ws.title == "Config":
+            continue  # Don't touch the salt
+        ws.clear()
+        ws.resize(rows=1, cols=10)
+    click.echo(f"✓ Cleared reiden map (salt preserved)")
+    click.echo(f"✓ Target '{name}' reset. Ready for fresh import.")
+
+
 # --- Process command ---
 
 @cli.command()
