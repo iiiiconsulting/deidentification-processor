@@ -91,7 +91,16 @@ def write_to_sheet(
 ):
     """Write deidentified data to the appropriate tab with dedup."""
     if dry_run:
-        click.echo(f"  [DRY RUN] {SHEET_TAB_NAMES[sheet_type]}: {len(df)} rows would be written")
+        # Still compute dedup stats in dry-run
+        seen_hashes = set()
+        dupes = 0
+        for _, row in df.iterrows():
+            h = content_hash(row)
+            if h in seen_hashes:
+                dupes += 1
+            else:
+                seen_hashes.add(h)
+        click.echo(f"  [DRY RUN] {SHEET_TAB_NAMES[sheet_type]}: {len(df) - dupes} rows would be written ({dupes} duplicates within input)")
         return
 
     gc = authorize_gspread()
@@ -109,8 +118,12 @@ def write_to_sheet(
 
     if not existing_data:
         headers = df.columns.tolist()
+        # Ensure sheet has room for header row
+        if ws.row_count < 1:
+            ws.resize(rows=1)
         ws.update("A1", [headers])
         existing_hashes = set()
+        click.echo(f"  {tab_name}: wrote headers {headers}")
     else:
         headers = existing_data[0]
         existing_hashes = set()
@@ -119,11 +132,20 @@ def write_to_sheet(
             existing_hashes.add(content_hash(row_series))
 
     new_rows = []
-    for _, row in df.iterrows():
+    dupe_count = 0
+    for idx, row in df.iterrows():
         h = content_hash(row)
         if h not in existing_hashes:
             new_rows.append(_sanitize_row(row.values.tolist()))
             existing_hashes.add(h)
+        else:
+            dupe_count += 1
+            if dupe_count <= 10:  # Log first 10 dupes
+                csv_row = idx + 2
+                pid = row.get("patientId", "?")
+                click.echo(f"    Duplicate at input row {csv_row}: patientId={str(pid)[:16]}...")
+            elif dupe_count == 11:
+                click.echo(f"    ... (suppressing further duplicate logs)")
 
     if new_rows:
         start_row = len(existing_data) + 1 if existing_data else 2
