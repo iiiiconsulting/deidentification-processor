@@ -89,13 +89,9 @@ def write_to_sheet(
     *,
     dry_run: bool = False,
 ):
-    """Write deidentified data to the appropriate tab with dedup.
-
-    Also appends new reiden map entries to the separate reiden spreadsheet.
-    """
+    """Write deidentified data to the appropriate tab with dedup."""
     if dry_run:
         click.echo(f"  [DRY RUN] {SHEET_TAB_NAMES[sheet_type]}: {len(df)} rows would be written")
-        click.echo(f"  [DRY RUN] ReidentificationMap: {len(reiden_entries)} entries would be added")
         return
 
     gc = authorize_gspread()
@@ -136,7 +132,23 @@ def write_to_sheet(
     else:
         click.echo(f"  {tab_name}: no new rows (all duplicates)")
 
-    # --- Write reiden map to separate spreadsheet ---
+
+def write_reiden_map(
+    reiden_spreadsheet_id: str,
+    reiden_entries: list[dict],
+    *,
+    dry_run: bool = False,
+):
+    """Write globally-deduped reiden map entries to the reiden spreadsheet.
+
+    Deduplicates by patientId only — same patient across multiple sheet types
+    gets one entry.
+    """
+    if dry_run:
+        click.echo(f"\n  [DRY RUN] ReidentificationMap: {len(reiden_entries)} unique patients would be mapped")
+        return
+
+    gc = authorize_gspread()
     reiden_spreadsheet = gc.open_by_key(reiden_spreadsheet_id)
 
     try:
@@ -152,22 +164,24 @@ def write_to_sheet(
     else:
         existing_patient_ids = set()
         for row in reiden_data[1:]:
-            if len(row) >= 3:
-                existing_patient_ids.add((row[0], row[2]))
+            if len(row) >= 1:
+                existing_patient_ids.add(row[0])  # patientId only
 
     new_reiden_rows = []
     for entry in reiden_entries:
-        key = (entry["patientId"], entry["source"])
-        if key not in existing_patient_ids:
+        pid = entry["patientId"]
+        if pid not in existing_patient_ids:
             new_reiden_rows.append(_sanitize_row([
                 entry["patientId"],
                 entry["originalName"],
                 entry["source"],
                 entry["dateAdded"],
             ]))
-            existing_patient_ids.add(key)
+            existing_patient_ids.add(pid)
 
     if new_reiden_rows:
         start_row = len(reiden_data) + 1 if reiden_data else 2
         reiden_ws.update(f"A{start_row}", new_reiden_rows)
         click.echo(f"  ReidentificationMap: added {len(new_reiden_rows)} new mappings")
+    else:
+        click.echo(f"  ReidentificationMap: no new mappings (all patients already mapped)")

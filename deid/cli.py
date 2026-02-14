@@ -116,6 +116,9 @@ def process(target_name, dry_run, files):
         click.echo("No recognized CSV files to process.", err=True)
         sys.exit(1)
 
+    # Collect reiden entries across all sheet types, deduped globally by patientId
+    all_reiden_entries = {}  # patientId → entry dict
+
     for sheet_type, fpaths in typed_files.items():
         tab_name = SHEET_TAB_NAMES[sheet_type]
         click.echo(f"\nProcessing {tab_name} ({len(fpaths)} file(s))...")
@@ -137,10 +140,24 @@ def process(target_name, dry_run, files):
 
         combined = pd.concat(dfs, ignore_index=True)
 
-        # Pipeline: preprocess → deidentify → write
+        # Pipeline: preprocess → deidentify → write data sheet
         combined = preprocess(combined, sheet_type)
         deidentified, reiden_entries = deidentify(combined, sheet_type, salt, dry_run=dry_run)
-        write_to_sheet(spreadsheet_id, reiden_spreadsheet_id, sheet_type, deidentified, reiden_entries, dry_run=dry_run)
+
+        # Global dedup: only keep first occurrence of each patientId
+        for entry in reiden_entries:
+            pid = entry["patientId"]
+            if pid not in all_reiden_entries:
+                all_reiden_entries[pid] = entry
+
+        # Write data sheet only (reiden written once at the end)
+        write_to_sheet(spreadsheet_id, reiden_spreadsheet_id, sheet_type, deidentified, [], dry_run=dry_run)
+
+    # Write all reiden entries at once, globally deduped
+    reiden_list = list(all_reiden_entries.values())
+    if reiden_list:
+        from .sheets import write_reiden_map
+        write_reiden_map(reiden_spreadsheet_id, reiden_list, dry_run=dry_run)
 
     click.echo("\n✓ Processing complete.")
 
