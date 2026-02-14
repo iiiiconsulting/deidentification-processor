@@ -7,6 +7,10 @@ OAuth client ID is embedded — just run `deid auth` to authenticate.
 import os
 from pathlib import Path
 
+# Allow Google to return fewer scopes than requested without raising an error.
+# Google's OAuth may not return all requested scopes in the token response.
+os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
+
 from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials

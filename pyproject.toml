@@ -21,3 +21,6 @@ deid = "deid.cli:cli"
 
 [tool.setuptools.packages.find]
 include = ["deid*"]
+
+[tool.setuptools.package-data]
+deid = ["../schemas/*.yaml", "../rules/*.yaml"]
