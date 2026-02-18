@@ -197,5 +197,76 @@ def process(target_name, dry_run, files):
     click.echo("\n✓ Processing complete.")
 
 
+# --- Reidentify command ---
+
+@cli.command()
+@click.option("--target", "target_name", required=True, help="Target name to read reiden map from.")
+@click.option("--output", "output_path", default=None, type=click.Path(), help="Output CSV path. Defaults to <input>_reidentified.csv.")
+@click.argument("file", required=True, type=click.Path(exists=True))
+def reidentify(target_name, output_path, file):
+    """Reidentify a deidentified CSV by replacing patientId hashes with original names.
+
+    Reads the reidentification map from the target's Google Sheet and replaces
+    all patientId values in the input file with their original names.
+    """
+    from .reidentifier import reidentify_file
+
+    try:
+        config = load_target(target_name)
+    except (FileNotFoundError, ValueError) as e:
+        click.echo(str(e), err=True)
+        sys.exit(1)
+
+    reiden_spreadsheet_id = config.get("reiden_spreadsheet_id")
+    if not reiden_spreadsheet_id:
+        click.echo("Target has no reiden spreadsheet configured.", err=True)
+        sys.exit(1)
+
+    input_path = Path(file)
+    if output_path is None:
+        output_path = input_path.parent / f"{input_path.stem}_reidentified{input_path.suffix}"
+    else:
+        output_path = Path(output_path)
+
+    try:
+        result_df, stats = reidentify_file(input_path, reiden_spreadsheet_id)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+    result_df.to_csv(output_path, index=False)
+
+    click.echo(f"\n✓ Reidentified {stats['matched']}/{stats['total']} patients")
+    if stats["unmatched"] > 0:
+        click.echo(f"  ⚠ {stats['unmatched']} patient ID(s) not found in reiden map")
+    click.echo(f"  Output: {output_path}")
+
+
+@cli.command("reidentify-sheet")
+@click.option("--target", "target_name", required=True, help="Target name to reidentify.")
+@click.option("--tab", "tab_name", default=None, help="Specific tab to reidentify. Default: all data tabs.")
+def reidentify_sheet(target_name, tab_name):
+    """Reidentify data directly in Google Sheets, creating a new reidentified spreadsheet.
+
+    Creates a copy of the data spreadsheet with patientId replaced by original names
+    and the _contentHash column removed.
+    """
+    from .reidentifier import reidentify_sheets
+
+    try:
+        config = load_target(target_name)
+    except (FileNotFoundError, ValueError) as e:
+        click.echo(str(e), err=True)
+        sys.exit(1)
+
+    try:
+        url = reidentify_sheets(config, tab_name=tab_name)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+    click.echo(f"\n✓ Reidentified spreadsheet created: {url}")
+
+
 if __name__ == "__main__":
     cli()
