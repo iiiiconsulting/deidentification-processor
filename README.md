@@ -1,121 +1,66 @@
-# deid — Financial CSV Deidentification Tool
+# Deidentification Processor
 
-A CLI tool that processes financial CSV exports, deidentifies patient PHI (names, addresses, etc.), and writes clean data to Google Sheets. Designed for multi-location clinic financial modeling.
+A client-side web app that deidentifies financial CSV exports — names are hashed, PHI is stripped, and financial data passes through unchanged. All processing happens in your browser; no data is sent to any server.
+
+**Live app:** https://iiiiconsulting.github.io/deidentification-processor/
 
 ## How It Works
 
 ```
-CSV Files → Pre-processor (DSL rules) → Deidentifier (hash/strip/pass) → Google Sheets
+CSV Files → Pre-processor (rules) → Deidentifier (hash/strip/pass) → ZIP Download
 ```
 
-- **Names** are hashed with SHA-256 + a per-target salt → `patientId`
-- **PHI fields** (addresses, emails, etc.) are stripped entirely
-- **Financial data** passes through unchanged
-- **Dedup** prevents duplicate rows on re-import
-- **Reidentification map** stored in a separate tab (hash → original name)
+1. Upload CSV files (drag and drop)
+2. File types are auto-detected from filenames
+3. Pre-processing rules are applied (optional, configurable per location)
+4. Names are hashed with SHA-256 + a per-location salt into a `patientId`
+5. PHI fields (addresses, emails, phone numbers) are stripped entirely
+6. Financial data passes through unchanged
+7. Download a ZIP containing deidentified CSVs and a reidentification map
 
-## Setup
+## Privacy & Security
 
-### 1. Install
+- **Runs entirely in your browser** — no backend, no API calls, no network requests
+- **Content-Security-Policy** blocks all outbound connections (enforced by the browser, verifiable in DevTools)
+- **Salt** is stored in browser localStorage, never transmitted
+- **Reidentification map** is the only sensitive output — store it securely
 
-```bash
-cd projects/deidentification-processor
-pip install -e .
-```
+## Supported Export Types
 
-### 2. Google OAuth Credentials
+| Export | Identity Column(s) | Stripped | Passed Through |
+|---|---|---|---|
+| Customers | firstName + lastName | Id, address, email, mobile, customerNumber, etc. | spendProfile, country, lastActivity, visits, sales, refunds, etc. |
+| Payments | Customer | Customer Number, Auth Code, Memo | Reference, Tran Type, Tender, Amount, Status, Source, Date/Time, Invoice, Tax |
+| Invoices | customerName | *(none)* | invoiceNumber, totalAmount, type, invoiceDate, dueDate, terms |
+| Product Sales Report | customerName | Username | productname, variantName, count, amount, profit, dateCreated |
+| Contracts | customerName | *(none)* | name, interval, every, on, plan, amount, status, lastInvoiceDate, nextBillDate |
 
-1. Create an OAuth 2.0 Client ID in [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-2. Enable the Google Sheets API and Google Drive API
-3. Download the client secrets JSON
-4. Save it as `~/.deid/client_secrets.json`
-
-### 3. Authenticate
-
-```bash
-deid auth
-```
-
-This opens a browser for Google OAuth. Credentials are saved to `~/.deid/credentials.json`.
-
-## Usage
-
-### Create a Target
-
-A "target" is a Google Sheet with 6 tabs (5 export types + reidentification map):
-
-```bash
-deid target create "Gameday HB"
-```
-
-### Process CSV Files
-
-```bash
-# Process specific files
-deid process --target "Gameday HB" ProductSalesReport.csv Payments.csv
-
-# Process all CSVs in a directory (shell glob)
-deid process --target "Gameday HB" ./exports/*.csv
-```
-
-File types are auto-detected from filenames. Supported patterns:
-- `ProductSalesReport.csv`, `ProductSalesReport (13).csv`
-- `Payments.csv`, `Payments (6).csv`
-- `Invoices.csv`, `Customers.csv`, `Contracts.csv`
-
-Re-importing the same data is safe — duplicate rows are skipped.
-
-### Manage Targets
-
-```bash
-deid target list
-deid target info "Gameday HB"
-```
+Filenames are matched case-insensitively. Numbered exports like `Payments (6).csv` are detected automatically.
 
 ## Pre-processing Rules
 
-Rules in `rules/<type>.yaml` apply transformations before deidentification. Useful for disambiguating patients (e.g., father/son with same name):
-
-```yaml
-rules:
-  - match:
-      firstName: "Edwin"
-      lastName: "Jones"
-      address1: "123 Main St"
-    set:
-      lastName: "Jones Jr."
-
-  - match:
-      customerName: "Jane Doe"
-    append:
-      customerName: " Sr."
-```
+Rules apply transformations before deidentification, useful for disambiguating patients (e.g., father/son with same name). Configured per-location in the Settings page:
 
 - **match**: AND across columns (case-insensitive)
 - **set**: Overwrite a column value
 - **append**: Append to a column value
-- Rules are processed in order
 
-## Column Handling
+## Development
 
-| Sheet | Hashed → patientId | Stripped | Passed Through |
-|---|---|---|---|
-| ProductSalesReport | customerName | Username | productname, variantName, count, amount, profit, dateCreated |
-| Payments | Customer | Customer Number, Auth Code, Memo | Reference, Tran Type, Tender, Amount, Status, Source, Date/Time, Invoice, Tax |
-| Invoices | customerName | *(none)* | invoiceNumber, totalAmount, type, invoiceDate, dueDate, terms |
-| Customers | firstName + lastName | Id, addressName, address1-2, city, state, zip, email, mobile, primaryContact, phoneIsMobile, customerNumber | spendProfile, country, lastActivity, isTaxExempt, isVip, lastVisit, visits, sales, refunds |
-| Contracts | customerName | *(none)* | name, interval, every, on, plan, amount, status, lastInvoiceDate, nextBillDate |
-
-## File Structure
-
+```bash
+npm install
+npm run dev       # Start dev server
+npm run build     # Production build → dist/
+npm run lint      # Type-check
 ```
-deid/                  # Python package
-├── cli.py             # CLI entry point
-├── auth.py            # Google OAuth2
-├── preprocessor.py    # Rule engine
-├── deidentifier.py    # Hash/strip/pass engine
-├── sheets.py          # Google Sheets integration
-└── config.py          # Configuration management
-schemas/               # Column classification per export type
-rules/                 # Pre-processing rules per export type
+
+## Deployment
+
+Pushes to `main` automatically deploy to GitHub Pages via the workflow in `.github/workflows/deploy.yml`.
+
+To deploy manually:
+
+```bash
+npm run build
+# Serve the dist/ directory with any static file server
 ```
